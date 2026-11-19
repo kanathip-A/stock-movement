@@ -99,7 +99,7 @@ class Component extends DCLogic {
   }
   doUpdate(v){ location.replace(location.pathname + '?v=' + encodeURIComponent(v || Date.now())); }
   componentDidMount(){
-    this.APP_VERSION = '2026-11-20.2';
+    this.APP_VERSION = '2026-11-20.3';
     try{
       const H=document.head, add=(tag,a)=>{ if(H.querySelector(tag+'[rel="'+a.rel+'"],'+tag+'[name="'+a.name+'"]')) return; const e=document.createElement(tag); Object.keys(a).forEach(k=>a[k]!=null&&e.setAttribute(k,a[k])); H.appendChild(e); };
       const base='ic'+'on-';
@@ -1318,7 +1318,7 @@ class Component extends DCLogic {
 
       loggedIn: !!auth, loggedOut: !auth, isAdmin, isStaff, isSuper,
       userLabel: auth ? auth.u : '',
-      appVersion: '2026-11-20.2', hasUpdate: !!s.updateV, applyUpdate: ()=>this.doUpdate(s.updateV),
+      appVersion: '2026-11-20.3', hasUpdate: !!s.updateV, applyUpdate: ()=>this.doUpdate(s.updateV),
       loginU: s.loginU, loginP: s.loginP, loginErr: s.loginErr, hasLoginErr: !!s.loginErr,
       setLoginU: e=>this.setState({loginU:e.target.value, loginErr:''}),
       setLoginP: e=>this.setState({loginP:e.target.value, loginErr:''}),

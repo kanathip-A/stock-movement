@@ -496,6 +496,39 @@ function viewDock(v) {
   return `<div class="dock">${syncBar}<nav class="tabs" aria-label="เมนูหลัก">${tabs.map(([id, label, ic, fn, badge]) => `<button class="tab" ${active === id ? 'aria-current="page"' : ''} ${on(fn)}><span class="pill-ic">${icon(ic, 'i i-24')}${badge ? `<span class="badge">${esc(badge)}</span>` : ''}</span>${label}</button>`).join('')}</nav></div>`;
 }
 
+/* ---------------- DOM patching ----------------
+   Update only what changed instead of replacing the whole page, so sheets don't
+   replay their open animation and images don't reload on every key press. */
+const scratch = document.createElement('div');
+function morph(target, html) {
+  scratch.innerHTML = html;
+  patchChildren(target, scratch);
+  scratch.textContent = '';
+}
+function patchChildren(from, to) {
+  const a = from.childNodes, b = to.childNodes;
+  let i = 0;
+  for (; i < b.length; i++) {
+    const n = b[i], o = a[i];
+    if (!o) { from.appendChild(n.cloneNode(true)); continue; }
+    if (o.nodeType !== n.nodeType || o.nodeName !== n.nodeName) { from.replaceChild(n.cloneNode(true), o); continue; }
+    if (n.nodeType === 3 || n.nodeType === 8) { if (o.nodeValue !== n.nodeValue) o.nodeValue = n.nodeValue; continue; }
+    if (n.nodeType !== 1) continue;
+    patchAttrs(o, n);
+    if (o.nodeName === 'INPUT') {
+      const val = n.getAttribute('value') ?? '';
+      if (o.type !== 'file' && o.value !== val && document.activeElement !== o) o.value = val;
+      continue;
+    }
+    patchChildren(o, n);
+  }
+  while (a.length > b.length) from.removeChild(from.lastChild);
+}
+function patchAttrs(o, n) {
+  for (const { name } of [...o.attributes]) if (!n.hasAttribute(name)) o.removeAttribute(name);
+  for (const { name, value } of n.attributes) if (o.getAttribute(name) !== value) o.setAttribute(name, value);
+}
+
 /* ---------------- render ---------------- */
 function render() {
   const v = comp.renderVals();
@@ -523,7 +556,7 @@ function render() {
       + `<main id="view">${body}<div class="t-cap5 muted" style="text-align:center">เวอร์ชัน ${esc(v.appVersion)}</div></main>`
       + viewDock(v);
   }
-  root.innerHTML = html + (v.loggedIn ? overlays(v) : '');
+  morph(root, html + (v.loggedIn ? overlays(v) : ''));
   document.body.classList.toggle('locked', !!(v.padOpen || v.histOpen || v.calOpen || v.branchOpen || v.reportOpen || ui.account));
 
   if (fk) {
