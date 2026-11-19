@@ -260,32 +260,38 @@ function viewAnalysis(v) {
   const anomalies = v.anomalies.map((a) => {
     const st = statusOf(a.flagText);
     const hs = a.bars.map((b) => Number((/height:([\d.]+)px/.exec(b.style) || [])[1] || 6));
+    const last = a.bars.length - 1;
+    const kv = (label, value, sub) => `<div class="kv"><span class="t-cap2 secondary">${label}</span><span class="kv-v"><span class="t-body7">${esc(value)}</span>${sub ? `<span class="t-cap5 muted">${esc(sub)}</span>` : ''}</span></div>`;
     return `<article class="acard st-${st}">
-      <div class="row"><span class="chip flag-${st}">${esc(a.flagText)}</span><span class="t-cap5 muted grow">${esc(a.shelf)} · ${esc(a.scope)}</span></div>
+      <div class="row"><span class="chip flag-${st}">${esc(a.flagText)}</span><span class="grow"></span><span class="t-cap5 muted">${esc(a.shelf)}</span></div>
       <h3 class="t-title3" style="margin:0">${esc(a.name)}</h3>
-      <div class="row" style="align-items:flex-end;gap:var(--sp-200)">
-        <div><div class="t-title6 pct">${esc(a.bigText)}</div><div class="t-cap5 muted">${esc(a.bigLabel)}</div></div>
-        <div class="spark grow">${a.bars.map((b, i) => `<div class="spark-col${i === a.bars.length - 1 ? ' last' : ''}"><span class="t-cap6">${esc(b.val)}</span><i style="height:${hs[i]}px"></i><span class="t-cap5">${esc(b.date)}</span></div>`).join('')}</div>
+      <div class="cause"><span class="t-title4">${esc(a.causeLabel)}</span><span class="t-cap2">${esc(a.cause)}</span></div>
+      <div class="headline-num">
+        <div><div class="t-h7 pct">${esc(a.bigText)}</div><div class="t-cap5 muted">ของยอดขาย · ${esc(a.scope)}</div></div>
+        <div style="text-align:right"><div class="t-body7 secondary">${esc(a.prevPctText)}</div><div class="t-cap5 muted">รอบก่อน ${esc(a.prevLabel)}</div></div>
       </div>
-      <div class="facts">
-        <div><div class="t-cap5 muted">ใช้จริง</div><div class="t-body7">${esc(a.actualText)}</div><div class="t-cap5 muted">${esc(a.rateSmall)}</div></div>
-        <div><div class="t-cap5 muted">ช่วงปกติ (ตามยอดขาย)</div><div class="t-body7">${esc(a.bandText)}</div><div class="t-cap5 muted">ส่วนเกิน ${esc(a.excessText)}</div></div>
-        <div><div class="t-cap5 muted">รอบก่อน ${esc(a.prevLabel)}</div><div class="t-body7">${esc(a.prevPctText)}</div><div class="t-cap5 muted">${esc(a.prevText)}</div></div>
+      <div class="spark-box">
+        <div class="t-cap5 muted">% ของยอดขาย ${a.bars.length} รอบล่าสุด</div>
+        <div class="spark">${a.bars.map((b, i) => `<div class="spark-col${i === last ? ' last' : ''}" title="${esc(b.date)} · ${esc(b.val)}%">${i === last ? `<span class="t-cap6">${esc(b.val)}</span>` : ''}<i style="height:${Math.round(hs[i] * 1.1)}px"></i><span class="t-cap5">${esc(String(b.date).split(' ')[0])}</span></div>`).join('')}</div>
       </div>
-      <div class="cause"><span class="t-cap3">${esc(a.causeLabel)}</span><span class="t-cap2 secondary">${esc(a.cause)}</span></div>
+      <div class="kv-list">
+        ${kv('ใช้จริงรอบนี้', a.actualText, a.rateSmall)}
+        ${kv('ช่วงปกติตามยอดขาย', a.bandText)}
+        ${a.excessText && a.excessText !== '—' ? kv('ส่วนเกิน / ขาด', a.excessText) : ''}
+        ${kv(`ใช้รอบก่อน (${esc(a.prevLabel)})`, a.prevText)}
+      </div>
     </article>`;
   }).join('');
   const compare = v.analysis.map((r) => {
-    const up = r.diffText.startsWith('+'), down = r.diffText.startsWith('-') || r.diffText.startsWith('−');
+    const up = r.diffText.startsWith('+'), down = /^[-−]/.test(r.diffText);
     return `<article class="crow">
-      <div class="row" style="align-items:flex-start"><div class="grow stack-4"><span class="t-cap5 muted">${esc(r.shelf)} · ${esc(r.scope)}</span><h3 class="t-body5" style="margin:0">${esc(r.name)}</h3></div>
-        <div style="text-align:right"><div class="t-cap5 muted">รอบนี้/ขาย <b class="t-body7">${esc(r.salePctText)}</b></div><div class="t-cap5 muted">รอบก่อน/ขาย <b class="t-body7">${esc(r.salePctPrevText)}</b></div></div></div>
-      <div class="facts">
-        <div><div class="t-cap5 muted">ใช้รอบนี้</div><div class="t-body7">${esc(r.usedText)}</div></div>
-        <div><div class="t-cap5 muted">รอบก่อน ${esc(r.prevLabel)}</div><div class="t-body7">${esc(r.prevUsedText)}</div></div>
-        <div><div class="t-cap5 muted">ต่างกัน</div><div class="t-body7" style="color:${up ? 'var(--text-error)' : down ? 'var(--text-success)' : 'inherit'}">${esc(r.diffText)}</div></div>
+      <div class="stack-4"><span class="t-cap5 muted">${esc(r.shelf)} · หน่วย ${esc(r.unit)}</span><h3 class="t-title4" style="margin:0">${esc(r.name)}</h3></div>
+      <div class="mini">
+        <span></span><span class="t-cap5 muted">รอบนี้</span><span class="t-cap5 muted">รอบก่อน ${esc(r.prevLabel)}</span>
+        <span class="t-cap2 secondary">ใช้ไป</span><span class="t-body7">${esc(r.usedText)}</span><span class="t-body7 secondary">${esc(r.prevUsedText)}</span>
+        <span class="t-cap2 secondary">% ของยอดขาย</span><span class="t-body7">${esc(r.salePctText)}</span><span class="t-body7 secondary">${esc(r.salePctPrevText)}</span>
       </div>
-      <div class="t-cap5 muted">${esc(r.note)} · หน่วย ${esc(r.unit)}</div>
+      <div class="row"><span class="chip ${up ? 'tone-error' : down ? 'tone-success' : 'tone-neutral'}">ต่างกัน ${esc(r.diffText)}</span><span class="t-cap5 muted grow" style="text-align:right">${esc(r.note)}</span></div>
     </article>`;
   }).join('');
   return head + seg + anomalies + `<h2 class="t-title3" style="margin:0">เทียบยอดใช้กับรอบก่อน</h2><div class="t-cap5 muted" style="margin-top:calc(-1 * var(--sp-200))">เรียงจากต่างมากสุด</div>` + compare;

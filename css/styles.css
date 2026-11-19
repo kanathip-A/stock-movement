@@ -339,3 +339,18 @@ button.list-row:hover { background: var(--surface-secondary-hover); }
   #reportprint .noprint { display: none !important; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
+
+/* analysis card layout v2 */
+.acard { gap: var(--sp-200); }
+.headline-num { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-200); }
+.spark-box { display: grid; gap: var(--sp-75); padding: var(--sp-100); border-radius: var(--r-12); background: var(--surface-primary); }
+.spark { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); align-items: end; gap: var(--sp-75); min-height: 72px; }
+.spark-col { display: grid; justify-items: center; align-content: end; gap: var(--sp-50); min-width: 0; }
+.spark-col i { width: 100%; max-width: 24px; }
+.spark-col span { font-size: 11px; line-height: 14px; }
+.kv-list { display: grid; }
+.kv { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-200); padding: var(--sp-75) 0; border-top: 1px solid var(--border-secondary); }
+.kv-v { display: grid; justify-items: end; text-align: right; gap: 2px; }
+.crow { gap: var(--sp-100); }
+.mini { display: grid; grid-template-columns: 1fr auto auto; column-gap: var(--sp-200); row-gap: var(--sp-75); align-items: baseline; padding: var(--sp-100); border-radius: var(--r-12); background: var(--surface-primary); }
+.mini > span:nth-child(3n+2), .mini > span:nth-child(3n) { text-align: right; }
