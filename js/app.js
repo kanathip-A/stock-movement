@@ -13,7 +13,27 @@ const onIn = (fn) => `data-in="${h(fn)}"`;
 const onFile = (fn) => `data-file="${h(fn)}"`;
 
 // view-only state (never stored)
-const ui = { filter: 'all', expanded: null, moves: {}, account: false, lastDate: '' };
+const ui = { filter: 'all', active: null, filled: {}, moves: {}, account: false, lastDate: '', order: [] };
+
+/* ---- one item at a time: an item stays open until both units are entered ---- */
+const filledOf = (code) => ui.filled[code] || (ui.filled[code] = { big: false, small: false });
+const markFilled = (code, field) => { filledOf(code)[field] = true; };
+// counted in an earlier session (or pulled from another device) = already complete
+const isComplete = (it) => it.done && (!ui.filled[it.code] || (ui.filled[it.code].big && ui.filled[it.code].small));
+const isPartial = (it) => it.done && !isComplete(it);
+const act = (code, fn, field) => (e) => { ui.active = code; if (field) markFilled(code, field); if (fn) fn(e); else comp.forceUpdate(); };
+function finishItem(code) {
+  ui.active = null;
+  const order = ui.order, i = order.indexOf(code);
+  const pending = (c) => { const it = comp.renderVals().groups.flatMap((g) => g.items).find((x) => x.code === c); return it && !it.done; };
+  const next = order.slice(i + 1).find(pending) || order.slice(0, i).find(pending) || null;
+  ui.active = next;
+  comp.forceUpdate();
+  if (next) requestAnimationFrame(() => requestAnimationFrame(() => {
+    const el = document.getElementById('it-' + next);
+    if (el) el.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }));
+}
 
 const comp = new Component({ historyLimit: 20, threshold: 10 });
 const root = document.getElementById('app');
@@ -57,7 +77,7 @@ function viewLogin(v) {
 function viewHeader(v) {
   const s = comp.state;
   const today = iso(new Date());
-  const goDate = (d) => () => { ui.expanded = null; comp.persist({ date: d > today ? today : d }); };
+  const goDate = (d) => () => { ui.active = null; comp.persist({ date: d > today ? today : d }); };
   return `<header class="header">
     <div class="header-row">
       <div class="header-title">
@@ -78,28 +98,46 @@ function viewHeader(v) {
 }
 
 /* ---------------- count ---------------- */
+function countStepper(it, field, unit, hint, value, dec, open, inc, err) {
+  const f = filledOf(it.code)[field] || isComplete(it);
+  const need = ui.active === it.code && !f;
+  return `<div>
+    <div class="stepper-label"><span class="t-title4">${esc(unit)}</span><span class="t-cap5 muted">${hint}</span>${f ? `<span class="filled-mark">${icon('check', 'i i-16')}</span>` : ''}</div>
+    <div class="stepper${err ? ' err' : need ? ' need' : ''}">
+      <button class="step" ${on(act(it.code, dec, field))} aria-label="ลด ${esc(unit)}">${icon('minus')}</button>
+      <button class="val t-title6" ${on(act(it.code, open))} aria-label="พิมพ์จำนวน ${esc(unit)}">${esc(value)}</button>
+      <button class="step" ${on(act(it.code, inc, field))} aria-label="เพิ่ม ${esc(unit)}">${icon('plus')}</button>
+    </div>
+  </div>`;
+}
+
 function itemCard(it) {
-  const expanded = !it.done || it.overWarn || ui.expanded === it.code;
-  if (!expanded) {
-    return `<button class="item-collapsed" ${on(() => { ui.expanded = it.code; comp.forceUpdate(); })} aria-label="แก้ยอดนับ ${esc(it.name)}">
+  const complete = isComplete(it);
+  const open = ui.active === it.code || !it.done || isPartial(it) || it.overWarn;
+  if (!open) {
+    return `<button class="item-collapsed" id="it-${esc(it.code)}" ${on(() => { ui.active = it.code; ui.filled[it.code] = { big: true, small: true }; comp.forceUpdate(); })} aria-label="แก้ยอดนับ ${esc(it.name)}">
       <span class="done-mark">${icon('check', 'i i-16')}</span>
       <span class="grow"><span class="t-body5 truncate" style="display:block">${esc(it.name)}</span>
         <span class="t-cap5 muted">เหลือ ${esc(it.left.toLocaleString('en-US'))} ${esc(it.smallUnit)} · ${esc(it.usedChipText)}</span></span>
       <span style="color:var(--icon-subtle)">${icon('edit')}</span>
     </button>`;
   }
+  const fl = filledOf(it.code);
+  const bothFilled = complete || (fl.big && fl.small);
+  const active = ui.active === it.code;
   const hasMoves = !!(it.recvBig || it.recvSmall || it.outBig || it.outSmall);
   const showMoves = hasMoves || ui.moves[it.code];
   const chipTone = !it.done ? 'tone-neutral' : it.overWarn ? 'tone-warning' : 'tone-info';
-  return `<article class="item${it.overWarn ? ' over' : ''}" id="it-${esc(it.code)}">
+  const missing = [!fl.big && !complete ? 'หน่วยใหญ่ (' + it.bigUnit + ')' : '', !fl.small && !complete ? 'หน่วยย่อย (' + it.smallUnit + ')' : ''].filter(Boolean);
+  return `<article class="item${it.overWarn ? ' over' : ''}${active ? ' active' : ''}${isPartial(it) && !active ? ' partial' : ''}" id="it-${esc(it.code)}">
     <div class="row" style="align-items:flex-start">
       <div class="grow stack-4">
         <h3 class="t-title3" style="margin:0">${esc(it.name)}</h3>
         <div class="row" style="gap:var(--sp-75);flex-wrap:wrap"><span class="t-cap6 muted">${esc(it.code)}</span><span class="t-cap5 muted">1 ${esc(it.bigUnit)} = ${esc(Number(it.bigSize).toLocaleString('en-US'))} ${esc(it.smallUnit)}</span></div>
       </div>
-      ${it.overWarn ? `<span style="color:var(--icon-warning)">${icon('warning', 'i i-24')}</span>` : it.done ? `<span class="done-mark">${icon('check', 'i i-16')}</span>` : ''}
+      ${it.overWarn ? `<span style="color:var(--icon-warning)">${icon('warning', 'i i-24')}</span>` : complete || bothFilled && it.done ? `<span class="done-mark">${icon('check', 'i i-16')}</span>` : ''}
     </div>
-    <button class="carry" ${on(it.openCarry)}>
+    <button class="carry" ${on(act(it.code, it.openCarry))}>
       <span class="grow stack-4"><span class="t-body6 secondary">ยอดยกมา</span><span class="t-cap5" style="color:${/ตั้งเอง/.test(it.carrySrc) ? 'var(--text-warning)' : 'var(--text-tertiary)'}">${esc(it.carrySrc)}</span></span>
       <span class="t-body7">${esc(it.carryText)}</span><span class="t-body6 secondary">${esc(it.smallUnit)}</span>
       <span style="color:var(--icon-subtle)">${icon('caret-right', 'i i-16')}</span>
@@ -107,24 +145,25 @@ function itemCard(it) {
     ${showMoves ? `
       <div class="moves">
         <div class="moves-head"><span class="t-title4">${esc(it.recvLabel)}</span><span class="t-cap5 muted">${esc(it.recvSub)}</span></div>
-        <div class="steppers">${stepper(it.bigUnit, 'หน่วยใหญ่', it.recvBig, it.recvBigDec, it.openRecvBig, it.recvBigInc)}${stepper(it.smallUnit, 'หน่วยย่อย', it.recvSmall, it.recvSmallDec, it.openRecvSmall, it.recvSmallInc)}</div>
+        <div class="steppers">${stepper(it.bigUnit, 'หน่วยใหญ่', it.recvBig, act(it.code, it.recvBigDec), act(it.code, it.openRecvBig), act(it.code, it.recvBigInc))}${stepper(it.smallUnit, 'หน่วยย่อย', it.recvSmall, act(it.code, it.recvSmallDec), act(it.code, it.openRecvSmall), act(it.code, it.recvSmallInc))}</div>
         <div class="moves-head" style="margin-top:var(--sp-100)"><span class="t-title4">${esc(it.outLabel)}</span><span class="t-cap5 muted">${esc(it.outSub)}</span></div>
-        <div class="steppers">${stepper(it.bigUnit, 'หน่วยใหญ่', it.outBig, it.outBigDec, it.openOutBig, it.outBigInc)}${stepper(it.smallUnit, 'หน่วยย่อย', it.outSmall, it.outSmallDec, it.openOutSmall, it.outSmallInc)}</div>
+        <div class="steppers">${stepper(it.bigUnit, 'หน่วยใหญ่', it.outBig, act(it.code, it.outBigDec), act(it.code, it.openOutBig), act(it.code, it.outBigInc))}${stepper(it.smallUnit, 'หน่วยย่อย', it.outSmall, act(it.code, it.outSmallDec), act(it.code, it.openOutSmall), act(it.code, it.outSmallInc))}</div>
         ${it.hasOutNote ? `<div class="warn-msg">${icon('warning', 'i i-16')}<span class="t-cap2">${esc(it.outNote)}</span></div>` : ''}
       </div>`
-      : `<button class="link-btn" ${on(() => { ui.moves[it.code] = true; comp.forceUpdate(); })}>${icon('plus', 'i i-16')}บันทึกรับเข้า / โอนออกวันนี้</button>`}
+      : `<button class="link-btn" ${on(act(it.code, () => { ui.moves[it.code] = true; comp.forceUpdate(); }))}>${icon('plus', 'i i-16')}บันทึกรับเข้า / โอนออกวันนี้</button>`}
     <div class="stack-4">
-      <div class="t-title5 secondary">นับที่เหลือจริง</div>
-      <div class="steppers">${stepper(it.bigUnit, 'หน่วยใหญ่', it.big, it.bigDec, it.openBig, it.bigInc, it.overWarn ? 'err' : '')}${stepper(it.smallUnit, 'หน่วยย่อย', it.small, it.smallDec, it.openSmall, it.smallInc, it.overWarn ? 'err' : '')}</div>
+      <div class="t-title5 secondary">นับที่เหลือจริง · กรอกให้ครบทั้ง 2 ช่อง (ไม่มีให้ใส่ 0)</div>
+      <div class="steppers">${countStepper(it, 'big', it.bigUnit, 'หน่วยใหญ่', it.big, it.bigDec, it.openBig, it.bigInc, it.overWarn)}${countStepper(it, 'small', it.smallUnit, 'หน่วยย่อย', it.small, it.smallDec, it.openSmall, it.smallInc, it.overWarn)}</div>
     </div>
     ${it.overWarn ? `<div class="warn-msg">${icon('warning', 'i i-16')}<span class="t-cap2">${esc(it.overText)}</span></div>` : ''}
     <div class="item-foot">
       <span class="t-body5 grow">${it.done ? `เหลือ ${esc(it.left.toLocaleString('en-US'))} ${esc(it.smallUnit)}` : `เหลือ — ${esc(it.smallUnit)}`}</span>
       <span class="chip ${chipTone}">${esc(it.usedChipText)}</span>
     </div>
+    ${missing.length && (active || it.done) ? `<div class="need-msg">${icon('info', 'i i-16')}<span class="t-cap2">ยังไม่ได้กรอก ${esc(missing.join(' และ '))} · กด + / − หรือแตะตัวเลข (ไม่มีของให้ใส่ 0)</span></div>` : ''}
     <div class="row" style="justify-content:space-between">
-      <button class="link-btn" ${on(it.openHist)}>${icon('history', 'i i-16')}ดูบันทึกย้อนหลัง</button>
-      ${it.done && !it.overWarn ? `<button class="btn btn-tertiary btn-sm" ${on(() => { ui.expanded = null; comp.forceUpdate(); })}>เสร็จ</button>` : ''}
+      <button class="link-btn" ${on(act(it.code, it.openHist))}>${icon('history', 'i i-16')}ดูบันทึกย้อนหลัง</button>
+      ${active || it.done ? `<button class="btn btn-primary btn-sm" ${on(() => finishItem(it.code))} ${bothFilled && it.done ? '' : 'disabled'}>${icon('check', 'i i-16')}เสร็จ ไปรายการถัดไป</button>` : ''}
     </div>
   </article>`;
 }
@@ -134,7 +173,8 @@ function viewCount(v) {
   const over = all.filter((i) => i.overWarn).length;
   const pct = Math.round((v.doneCount / v.totalCount) * 100);
   const f = ui.filter;
-  const match = (i) => f === 'all' || (f === 'pending' && !i.done) || (f === 'check' && i.overWarn) || (f === 'done' && i.done);
+  ui.order = all.map((i) => i.code);
+  const match = (i) => i.code === ui.active || isPartial(i) || f === 'all' || (f === 'pending' && !i.done) || (f === 'check' && i.overWarn) || (f === 'done' && i.done);
   const shelfIcon = { 'ของแห้ง': ['shelf-dry', 'shelf-dry'], 'ของเย็น': ['shelf-cold', 'shelf-cold'], 'บุฟเฟ่ต์': ['shelf-buffet', 'shelf-cold'] };
   const groups = v.groups.map((g) => {
     const list = g.items.filter(match);
@@ -404,6 +444,31 @@ function viewAdmin(v) {
     </section>`;
 }
 
+/* ---------------- pad: big → small → next item ---------------- */
+function padNextLabel() {
+  const p = comp.state.pad;
+  if (p && p.kind === 'big' && !filledOf(p.code).small) return 'บันทึก → หน่วยย่อย';
+  if (p && p.kind === 'small' && !filledOf(p.code).big) return 'บันทึก → หน่วยใหญ่';
+  if (p && (p.kind === 'big' || p.kind === 'small')) return 'บันทึก → ถัดไป';
+  return 'บันทึก';
+}
+function confirmPadChain(v) {
+  const p = comp.state.pad;
+  v.confirmPad();
+  if (!p || comp.state.pad) return;            // not saved (e.g. carry needs a reason)
+  if (p.kind !== 'big' && p.kind !== 'small') return;
+  ui.active = p.code;
+  markFilled(p.code, p.kind);
+  const f = filledOf(p.code);
+  if (!f.big) comp.setState({ pad: { code: p.code, kind: 'big' }, padBuf: '' });
+  else if (!f.small) comp.setState({ pad: { code: p.code, kind: 'small' }, padBuf: '' });
+  else {
+    // both units entered: move on by itself, unless the count needs checking
+    const it = comp.renderVals().groups.flatMap((g) => g.items).find((x) => x.code === p.code);
+    if (it && !it.overWarn) finishItem(p.code); else comp.forceUpdate();
+  }
+}
+
 /* ---------------- overlays ---------------- */
 const sheet = (body, close, label) => `<div class="overlay" role="dialog" aria-modal="true" aria-label="${esc(label)}"><div class="scrim" ${on(close)}></div><div class="sheet-panel"><div class="grabber"></div>${body}</div></div>`;
 
@@ -424,7 +489,7 @@ function overlays(v) {
         ${v.hasCarryErr ? `<div class="t-cap2" style="color:var(--text-error)">${esc(v.carryErr)}</div>` : ''}
       </div>` : ''}
       <div class="keypad calc">${keys}</div>
-      <div class="btn-row">${btn('ยกเลิก', v.closePad, 'btn-secondary')}${btn('บันทึก', v.confirmPad)}</div>`, v.closePad, 'แป้นตัวเลข');
+      <div class="btn-row">${btn('ยกเลิก', v.closePad, 'btn-secondary')}${btn(padNextLabel(), () => confirmPadChain(v))}</div>`, v.closePad, 'แป้นตัวเลข');
   }
   if (v.histOpen) {
     out += sheet(`<div class="stack-4"><div class="t-cap4" style="color:var(--text-info)">บันทึกย้อนหลัง</div><div class="t-title2">${esc(v.histName)}</div></div>
@@ -437,7 +502,7 @@ function overlays(v) {
     const cells = v.calCells.map((c) => {
       if (!c.label) return '<span></span>';
       const sel = /gradient/.test(c.style), today = /#E8762C/i.test(c.style) && !sel, data = /underline/.test(c.style);
-      return `<button class="cal-cell${sel ? ' sel' : ''}${today ? ' today' : ''}${data ? ' has' : ''}" ${on(() => { c.pick(); ui.expanded = null; })}>${esc(c.label)}</button>`;
+      return `<button class="cal-cell${sel ? ' sel' : ''}${today ? ' today' : ''}${data ? ' has' : ''}" ${on(() => { c.pick(); ui.active = null; })}>${esc(c.label)}</button>`;
     }).join('');
     out += sheet(`<div class="row"><button class="nav-btn ghost" ${on(v.prevMonth)} aria-label="เดือนก่อน">${icon('caret-left')}</button><div class="grow" style="text-align:center"><div class="t-title3">${esc(v.calTitle)}</div><div class="t-cap5 muted">เลือกวันที่ต้องการนับ · ขีดเขียว = มีข้อมูล</div></div><button class="nav-btn ghost" ${on(v.nextMonth)} aria-label="เดือนถัดไป">${icon('caret-right')}</button></div>
       <div class="cal">${v.dowLabels.map((d) => `<span class="t-cap4 muted">${esc(d.label)}</span>`).join('')}${cells}</div>
@@ -534,7 +599,7 @@ function render() {
   const v = comp.renderVals();
   H = [];
   const s = comp.state;
-  if (ui.lastDate !== s.date) { ui.lastDate = s.date; ui.expanded = null; ui.moves = {}; }
+  if (ui.lastDate !== s.date) { ui.lastDate = s.date; ui.active = null; ui.filled = {}; ui.moves = {}; }
 
   // focus + caret restore across re-renders
   const ae = document.activeElement;

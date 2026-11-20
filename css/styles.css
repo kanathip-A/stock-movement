@@ -354,3 +354,12 @@ button.list-row:hover { background: var(--surface-secondary-hover); }
 .crow { gap: var(--sp-100); }
 .mini { display: grid; grid-template-columns: 1fr auto auto; column-gap: var(--sp-200); row-gap: var(--sp-75); align-items: baseline; padding: var(--sp-100); border-radius: var(--r-12); background: var(--surface-primary); }
 .mini > span:nth-child(3n+2), .mini > span:nth-child(3n) { text-align: right; }
+
+/* active item + required fields */
+.item { scroll-margin-top: 188px; }
+.item.active { border: 2px solid var(--border-action); }
+.item.partial { border: 2px solid var(--border-warning); }
+.stepper.need { border: 2px dashed var(--border-action); }
+.filled-mark { color: var(--icon-success); display: inline-flex; margin-left: auto; }
+.need-msg { display: flex; gap: var(--sp-75); padding: var(--sp-75) var(--sp-100); border-radius: var(--r-8); background: var(--surface-info-subtle); color: var(--text-info); }
+.need-msg svg { margin-top: 2px; }
