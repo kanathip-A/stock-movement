@@ -99,7 +99,7 @@ class Component extends DCLogic {
   }
   doUpdate(v){ location.replace(location.pathname + '?v=' + encodeURIComponent(v || Date.now())); }
   componentDidMount(){
-    this.APP_VERSION = '2026-11-20.5';
+    this.APP_VERSION = '2026-11-21.1';
     try{
       const H=document.head, add=(tag,a)=>{ if(H.querySelector(tag+'[rel="'+a.rel+'"],'+tag+'[name="'+a.name+'"]')) return; const e=document.createElement(tag); Object.keys(a).forEach(k=>a[k]!=null&&e.setAttribute(k,a[k])); H.appendChild(e); };
       const base='ic'+'on-';
@@ -108,7 +108,7 @@ class Component extends DCLogic {
       add('link',{rel:'manifest',href:'manifest'+'.json'});
       add('meta',{name:'apple-mobile-web-app-title',content:'สต็อก'});
       add('meta',{name:'apple-mobile-web-app-capable',content:'yes'});
-      add('meta',{name:'theme-color',content:'#0e7c66'});
+      // theme-color is set in index.html (light / dark)
     }catch(e){}
     setTimeout(()=>this.checkUpdate(true), 1200);
     this._updTimer = setInterval(()=>this.checkUpdate(false), 5*60*1000);
@@ -1321,7 +1321,7 @@ class Component extends DCLogic {
 
       loggedIn: !!auth, loggedOut: !auth, isAdmin, isStaff, isSuper,
       userLabel: auth ? auth.u : '',
-      appVersion: '2026-11-20.5', hasUpdate: !!s.updateV, applyUpdate: ()=>this.doUpdate(s.updateV),
+      appVersion: '2026-11-21.1', hasUpdate: !!s.updateV, applyUpdate: ()=>this.doUpdate(s.updateV),
       loginU: s.loginU, loginP: s.loginP, loginErr: s.loginErr, hasLoginErr: !!s.loginErr,
       setLoginU: e=>this.setState({loginU:e.target.value, loginErr:''}),
       setLoginP: e=>this.setState({loginP:e.target.value, loginErr:''}),

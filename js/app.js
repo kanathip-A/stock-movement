@@ -78,23 +78,28 @@ function viewHeader(v) {
   const s = comp.state;
   const today = iso(new Date());
   const goDate = (d) => () => { ui.active = null; comp.persist({ date: d > today ? today : d }); };
-  return `<header class="header">
-    <div class="header-row">
-      <div class="header-title">
-        <h1 class="t-title2">ตรวจความเคลื่อนไหวสินค้า</h1>
-        <div class="t-cap4">รอบนับประจำวัน${v.isAdmin ? ` · ${esc(s.auth.u)}` : ''}</div>
-      </div>
+  const titles = { count: 'นับสินค้า', sales: 'ยอดขาย', analysis: 'วิเคราะห์', peer: 'เทียบสาขา', history: 'ย้อนหลัง', sync: 'แอดมิน' };
+  const title = v.isCount ? titles.count : (titles[s.tab] || titles.count);
+  const isToday = s.date === today;
+  return `<div class="toolbar">
       ${v.isAdmin
-        ? `<button class="chip-btn" ${on(v.toggleBranch)} aria-label="เปลี่ยนสาขา">${icon('branch', 'i i-16')}<span class="t-body7">${esc(v.branch)}</span>${icon('caret-down', 'i i-16')}</button>`
-        : `<button class="chip-btn" ${on(() => { ui.account = true; comp.forceUpdate(); })} aria-label="บัญชีสาขา ${esc(v.branch)}">${icon('branch', 'i i-16')}<span class="t-body7">${esc(v.branch)}</span></button>`}
-      <button class="nav-btn nav-sm" ${on(v.logoutAsk)} aria-label="ออกจากระบบ">${icon('logout')}</button>
+        ? `<button class="glass glass-chip" ${on(v.toggleBranch)} aria-label="เปลี่ยนสาขา">${icon('branch', 'i i-16')}<span class="t-body7">${esc(v.branch)}</span>${icon('caret-down', 'i i-16')}</button>`
+        : `<button class="glass glass-chip" ${on(() => { ui.account = true; comp.forceUpdate(); })} aria-label="บัญชีสาขา ${esc(v.branch)}">${icon('branch', 'i i-16')}<span class="t-body7">${esc(v.branch)}</span></button>`}
+      <span class="toolbar-title t-title4" aria-hidden="true">${esc(title)}</span>
+      <span class="toolbar-actions">
+        <button class="glass glass-ic" ${on(v.openCal)} aria-label="เลือกวันที่">${icon('calendar')}</button>
+        <button class="glass glass-ic" ${on(v.logoutAsk)} aria-label="ออกจากระบบ">${icon('logout')}</button>
+      </span>
     </div>
-    <div class="date-row">
-      <button class="nav-btn" ${on(goDate(addDays(s.date, -1)))} aria-label="วันก่อนหน้า">${icon('caret-left')}</button>
-      <button class="date-btn" ${on(v.openCal)}>${icon('calendar', 'i i-16')}<span>${esc(v.dateLong)}</span></button>
-      <button class="nav-btn" ${on(goDate(addDays(s.date, 1)))} ${s.date >= today ? 'disabled' : ''} aria-label="วันถัดไป">${icon('caret-right')}</button>
-    </div>
-  </header>`;
+    <header class="header">
+      <h1 class="large-title">${esc(title)}</h1>
+      <div class="date-row">
+        <button class="date-step" ${on(goDate(addDays(s.date, -1)))} aria-label="วันก่อนหน้า">${icon('caret-left', 'i i-16')}</button>
+        <button class="date-btn" ${on(v.openCal)}>${isToday ? '<span class="date-today">วันนี้</span>' : ''}<span>${esc(v.dateLong)}</span></button>
+        <button class="date-step" ${on(goDate(addDays(s.date, 1)))} ${s.date >= today ? 'disabled' : ''} aria-label="วันถัดไป">${icon('caret-right', 'i i-16')}</button>
+        ${v.isAdmin ? `<span class="t-cap5 muted date-user">${esc(s.auth.u)}</span>` : ''}
+      </div>
+    </header>`;
 }
 
 /* ---------------- count ---------------- */
@@ -554,11 +559,11 @@ function viewDock(v) {
     ['analysis', 'วิเคราะห์', 'analysis', v.goAnalysis, v.analysisBadge ? v.analysisBadgeText : ''], ['peer', 'เทียบสาขา', 'peer', v.goPeer, ''], ['history', 'ย้อนหลัง', 'history', v.goHistory, '']];
   if (v.isSuper) tabs.push(['sync', 'แอดมิน', 'admin', v.goSync, '']);
   const active = v.isCount ? 'count' : s.tab;
-  const syncBar = v.isCount ? `<div class="savebar">
+  const syncBar = v.isCount ? `<div class="savebar glass-panel">
       <div class="grow stack-4" style="min-width:0"><div class="t-body5 truncate">${esc(v.lastSyncText)}</div><div class="t-cap5 truncate" style="color:${v.hasSyncMsg ? (s.syncOk ? 'var(--text-success)' : 'var(--text-error)') : 'var(--text-tertiary)'}">${esc(v.hasSyncMsg ? v.syncMsg : `นับแล้ว ${v.doneCount}/${v.totalCount} · ส่งได้แม้ยังนับไม่ครบ`)}</div></div>
       <button class="btn btn-primary" ${on(v.doSync)} ${s.syncing ? 'disabled' : ''}>${icon('sync', 'i')}${s.syncing ? 'กำลังส่ง…' : 'ส่งขึ้น Sheet'}</button>
     </div>` : '';
-  return `<div class="dock">${syncBar}<nav class="tabs" aria-label="เมนูหลัก">${tabs.map(([id, label, ic, fn, badge]) => `<button class="tab" ${active === id ? 'aria-current="page"' : ''} ${on(fn)}><span class="pill-ic">${icon(ic, 'i i-24')}${badge ? `<span class="badge">${esc(badge)}</span>` : ''}</span>${label}</button>`).join('')}</nav></div>`;
+  return `<div class="dock">${syncBar}<nav class="tabs glass-panel" aria-label="เมนูหลัก">${tabs.map(([id, label, ic, fn, badge]) => `<button class="tab" ${active === id ? 'aria-current="page"' : ''} ${on(fn)}><span class="pill-ic">${icon(ic, 'i i-24')}${badge ? `<span class="badge">${esc(badge)}</span>` : ''}</span>${label}</button>`).join('')}</nav></div>`;
 }
 
 /* ---------------- DOM patching ----------------
@@ -662,6 +667,13 @@ document.addEventListener('keydown', (e) => {
   else if (v.branchOpen) v.toggleBranch(); else if (v.reportOpen) v.closeReport();
   else if (ui.account) { ui.account = false; comp.forceUpdate(); }
 });
+
+// iOS-style toolbar: show the small title once the large title scrolls away
+let scrolledFlag = false;
+addEventListener('scroll', () => {
+  const on = scrollY > 56;
+  if (on !== scrolledFlag) { scrolledFlag = on; document.body.classList.toggle('scrolled', on); }
+}, { passive: true });
 
 comp._render = render;
 render();
