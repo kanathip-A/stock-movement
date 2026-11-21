@@ -1,7 +1,7 @@
 import { DCLogic } from './dc.js';
 
 const ITEMS = [
-  {shelf:'ของแห้ง', code:'RM00051', name:'ข้าวสารญี่ปุ่น 5KG. 5pk/sac', sys:4500, bigUnit:'กระสอบ25กก.', bigSize:25000, smallUnit:'กรัม', rate:1500, pdfUnit:'sac', pdfDiv:5000},
+  {shelf:'ของแห้ง', code:'RM00051', name:'ข้าวสารญี่ปุ่น 5KG. 5pk/sac', sys:4500, bigUnit:'กระสอบ25กก.', bigSize:25000, smallUnit:'กรัม', rate:1500, pdfUnit:'ถุง5กก.', pdfDiv:5000},
   {shelf:'ของแห้ง', code:'RM00065', name:'น้ำส้มปรุงสำเร็จ 5L. (น้ำปรุงซูชิ) (6.29)', sys:2400, bigUnit:'แกลลอน(6290)', bigSize:6290, smallUnit:'กรัม', rate:800},
   {shelf:'ของเย็น', code:'SM00005', name:'เนื้อปลาแซลมอน', sys:2700, bigUnit:'กิโลกรัม', bigSize:1000, smallUnit:'กรัม', rate:900},
   {shelf:'ของเย็น', code:'SM00020', name:'เนื้อวากิวสไลด์ 500g. (ซูชิ)', sys:780, bigUnit:'แพค(500)', bigSize:500, smallUnit:'กรัม', rate:260},
@@ -99,7 +99,7 @@ class Component extends DCLogic {
   }
   doUpdate(v){ location.replace(location.pathname + '?v=' + encodeURIComponent(v || Date.now())); }
   componentDidMount(){
-    this.APP_VERSION = '2026-11-20.4';
+    this.APP_VERSION = '2026-11-20.5';
     try{
       const H=document.head, add=(tag,a)=>{ if(H.querySelector(tag+'[rel="'+a.rel+'"],'+tag+'[name="'+a.name+'"]')) return; const e=document.createElement(tag); Object.keys(a).forEach(k=>a[k]!=null&&e.setAttribute(k,a[k])); H.appendChild(e); };
       const base='ic'+'on-';
@@ -548,7 +548,7 @@ class Component extends DCLogic {
         if(r.touched[it.code]) items[it.code] = {carry:this.carryOf(it,d), recv:this.recvOf(it,d), out:this.outOf(it,d), left:this.leftOf(it,d), used:this.usedOf(it,d)};
       });
       if(!Object.keys(items).length) return;
-      const wkSales = (s.salesByDate||{})['W'+d];
+      const wkSales = r.week ? (s.salesByDate||{})['W'+d] : 0;
       const localSales = Number(wkSales || (s.salesByDate||{})[d] || 0);
       const prev = rounds[d];
       rounds[d] = {
@@ -810,7 +810,7 @@ class Component extends DCLogic {
     // แอดมินดูของสาขาที่เลือก จึงอ่านจาก Sheet เท่านั้น ไม่เอายอดที่พิมพ์ไว้ในเครื่องแอดมินมาปน
     const localSale = d => isAdmin ? 0 : (s.salesByDate[d]||0);
     const dayVal = d => localSale(d)
-      || ((d===wk[6] && !wk.some(x=>localSale(x))) ? localSale(weekKey) : 0)
+      || ((isWeek && d===wk[6] && !wk.some(x=>localSale(x))) ? localSale(weekKey) : 0)
       || sheetSales(d);
     const salesTotal = isWeek ? (localSale(weekKey) || wk.reduce((a,d)=>a + dayVal(d), 0))
       : dayVal(s.date);
@@ -1120,7 +1120,10 @@ class Component extends DCLogic {
     byBig.forEach((c,i)=>{ autoGrade[c] = i < third ? 'A' : (i < third*2 ? 'B' : 'C'); });
     const gradeOf = c => ((s.gradeMap||{})[c] || autoGrade[c] || '–');
     const myGrade = pv ? gradeOf(branch) : '–';
-    const groupCodes = pCodes.filter(c=>gradeOf(c) === myGrade);
+    // เทียบเฉพาะร้านรูปแบบเดียวกัน (บุฟเฟต์กับบุฟเฟต์) และขายใกล้เคียงกัน · ถ้าเกรดเดียวกันไม่มีร้านรูปแบบเดียวกัน ใช้ทุกร้านรูปแบบเดียวกัน
+    const sameFormat = pCodes.filter(c=>isBuf(c) === isBuf(branch));
+    const sameGrade = sameFormat.filter(c=>gradeOf(c) === myGrade);
+    const groupCodes = sameGrade.filter(c=>c!==branch).length ? sameGrade : sameFormat;
     const otherCodes = groupCodes.filter(c=>c!==branch);
     const mySale = pv && pv[branch] ? Number(pv[branch].sales||0) : 0;
     const pctOf = (c, code) => { const p = pv[c]; const used = p && p.items ? Number(p.items[code]||0) : 0;
@@ -1318,7 +1321,7 @@ class Component extends DCLogic {
 
       loggedIn: !!auth, loggedOut: !auth, isAdmin, isStaff, isSuper,
       userLabel: auth ? auth.u : '',
-      appVersion: '2026-11-20.4', hasUpdate: !!s.updateV, applyUpdate: ()=>this.doUpdate(s.updateV),
+      appVersion: '2026-11-20.5', hasUpdate: !!s.updateV, applyUpdate: ()=>this.doUpdate(s.updateV),
       loginU: s.loginU, loginP: s.loginP, loginErr: s.loginErr, hasLoginErr: !!s.loginErr,
       setLoginU: e=>this.setState({loginU:e.target.value, loginErr:''}),
       setLoginP: e=>this.setState({loginP:e.target.value, loginErr:''}),
@@ -1552,7 +1555,7 @@ class Component extends DCLogic {
       myIsBuffet: isBuf(branch), buffetNote: 'ร้านบุฟเฟต์ · ยอดใช้ต่อยอดขายมักสูงกว่าร้าน à la carte ควรดูประกอบ',
       hasPeerTop: peerHot > 0 && mySale > 0,
       peerTop: peerItems.filter(p=>p.diff > 10).slice(0,3),
-      peerGroupLine: groupCodes.length > 1 ? ('เทียบกับอีก ' + (groupCodes.length-1) + ' สาขาที่ขายต่อวันใกล้เคียงกัน') : 'กลุ่มนี้ยังไม่มีสาขาอื่นให้เทียบ',
+      peerGroupLine: groupCodes.length > 1 ? ('เทียบกับอีก ' + (groupCodes.length-1) + ' สาขา' + (isBuf(branch) ? 'บุฟเฟต์' : 'รูปแบบเดียวกัน') + (sameGrade.filter(c=>c!==branch).length ? ' ที่ขายต่อวันใกล้เคียงกัน' : ' (ยอดขายต่างกลุ่ม)')) : 'ยังไม่มีสาขารูปแบบเดียวกันให้เทียบ',
       peerVerdict: peerHot ? (peerHot + ' รายการ ใช้มากกว่าสาขาอื่น') : 'ใช้ใกล้เคียงสาขาอื่นทุกรายการ',
       peerVerdictSub: peerHot ? ('3 รายการที่เกินมากที่สุด (คิดที่ยอดขาย 30 วันของเรา) · ดูทั้งหมดด้านล่าง') : 'ไม่มีรายการไหนใช้เกินสาขาอื่นในกลุ่มเกิน 10%',
       peerVerdictStyle: 'padding:12px 14px;border-top:1px solid #F3EADB;' + (peerHot ? 'background:#FDEDE6;color:#A33C0A' : 'background:#E6F2E9;color:#2F6B45'),
